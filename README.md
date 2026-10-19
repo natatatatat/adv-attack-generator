@@ -4,7 +4,7 @@ Interactive tool that generates a ready-to-run adversarial attack script.
 
 ## Environment Setup
 
-### 1. Create a virtual environment (recommended)
+### Standard setup (most systems)
 
 ```bash
 # macOS / Linux
@@ -16,25 +16,47 @@ python -m venv venv
 venv\Scripts\activate
 ```
 
-### 2. Upgrade pip
-
 ```bash
 pip install --upgrade pip
+pip install torch torchvision numpy pillow scikit-learn
 ```
 
-### 3. Install dependencies
+### Kali Linux on Apple Silicon (M1/M2/M3/M5) — important
+
+If you see:
+
+```
+zsh: illegal hardware instruction  python -c "import torch; ..."
+```
+
+Use **Python 3.13** (3.14 wheels are unstable on aarch64) and set the OpenBLAS workaround:
 
 ```bash
-pip install torch torchvision numpy pillow
+# Install Python 3.13
+sudo apt update
+sudo apt install python3.13 python3.13-venv python3.13-dev -y
+
+# Create environment
+python3.13 -m venv venv
+source venv/bin/activate
+
+# Install packages
+pip install --upgrade pip
+pip install torch torchvision numpy pillow scikit-learn
+
+# Make the OpenBLAS fix permanent
+echo 'export OPENBLAS_CORETYPE=ARMV8' >> venv/bin/activate
+deactivate
+source venv/bin/activate
 ```
 
-> **GPU (optional):** If you have an NVIDIA GPU and want CUDA support, install the matching PyTorch build from [pytorch.org](https://pytorch.org).
-
-### 4. Verify
+### Verify
 
 ```bash
-python -c "import torch; print(torch.__version__)"
+python -c "import torch; print(torch.__version__); print('OK')"
 ```
+
+> **GPU note:** On Apple Silicon, GPU (MPS) only works on macOS, not inside Kali. PyTorch in Kali uses the CPU.
 
 ## Quick Start
 
