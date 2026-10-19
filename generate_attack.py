@@ -21,6 +21,19 @@ ATTACKS = {
     "3": {"name": "PGD", "description": "Projected Gradient Descent"},
 }
 
+# Compatible pairs (model_type, dataset_type)
+COMPATIBLE = {
+    "mlp_digits": {"sklearn_digits"},
+    "cnn_small": {"mnist", "sklearn_digits"},
+    "cnn_cifar": {"cifar10", "cifar100"},
+    "resnet18": {"imagenet", "cifar10", "cifar100", "image_folder"},
+    "pretrained_custom": {"sklearn_digits", "mnist", "cifar10", "cifar100", "imagenet", "image_folder"},
+    "custom": {"sklearn_digits", "mnist", "cifar10", "cifar100", "imagenet", "image_folder"},
+}
+
+def is_compatible(model_type: str, dataset_type: str) -> bool:
+    return dataset_type in COMPATIBLE.get(model_type, set())
+
 DATASETS = {
     "1": {
         "name": "sklearn_digits",
@@ -583,6 +596,18 @@ def main():
 
     dataset_choice = choose(DATASETS, "Choose dataset:")
     dataset_type = DATASETS[dataset_choice]["name"]
+
+    # Warn or block incompatible combinations
+    if not is_compatible(model_type, dataset_type):
+        print(f"\nWarning: '{model_type}' is not designed for '{dataset_type}'.")
+        print("This will likely crash. Recommended pairs:")
+        print("  mlp_digits  → sklearn_digits")
+        print("  cnn_small   → mnist")
+        print("  cnn_cifar   → cifar10 / cifar100")
+        print("  resnet18    → imagenet or cifar")
+        if not yes_no("Continue anyway?", default=False):
+            print("Aborting. Please re-run and choose a matching pair.")
+            return
 
     # Single-image mode
     single_image = yes_no("Attack a single uploaded image instead of a dataset?", default=False)
