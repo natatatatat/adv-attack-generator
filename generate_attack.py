@@ -408,21 +408,23 @@ def attack(model, x, y, epsilon={epsilon}, step_size={step_size}, steps={steps})
 '''
 
     train_fn = '''
-def train_quick(model, x, y, epochs=3, lr=0.01):
-    """Short training so the model is not random."""
+def train_quick(model, x, y, epochs=8, lr=0.001):
+    """Train longer so the model learns real patterns."""
     model.train()
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     loss_fn = nn.CrossEntropyLoss()
-    # Use a small subset if data is large
-    n = min(len(x), 500)
+    n = min(len(x), 1000)
     x_t, y_t = x[:n], y[:n]
+    print(f"Quick-training on {n} samples for {epochs} epochs...")
     for epoch in range(epochs):
         opt.zero_grad()
         loss = loss_fn(model(x_t), y_t)
         loss.backward()
         opt.step()
-        print(f"  quick train epoch {epoch+1}/{epochs} loss={loss.item():.4f}")
+        if (epoch + 1) % 2 == 0 or epoch == 0:
+            print(f"  epoch {epoch+1}/{epochs} loss={loss.item():.4f}")
     model.eval()
+    print("Quick training finished.")
 '''
 
     script = f'''#!/usr/bin/env python3
@@ -484,7 +486,49 @@ def main():
 
     adv_acc = evaluate(model, x_adv, y)
     print(f"Adversarial accuracy: {{adv_acc:.4f}}")
-    print(f"Drop: {{clean_acc - adv_acc:.4f}}")
+    drop = clean_acc - adv_acc
+    print(f"Accuracy drop: {{drop:.4f}}")
+
+    # Plain-language result
+    if len(x) == 1:
+        print(f"\\nResult: image changed from class {{orig_pred.item()}} to class {{adv_pred.item()}}")
+        if orig_pred.item() != adv_pred.item():
+            print("Attack succeeded on this image.")
+        else:
+            print("Attack did not change the prediction. Try a larger epsilon.")
+    else:
+        success_rate = (orig_pred != adv_pred).float().mean().item()
+        print(f"\\nResult: attack changed the prediction on {{success_rate:.0%}} of samples.")
+        if drop > 0.1:
+            print("Attack was effective.")
+        else:
+            print("Attack had limited effect. Try a larger epsilon or more steps.")
+
+    # Save before/after image for single sample
+    if len(x) == 1:
+        try:
+            import matplotlib.pyplot as plt
+            fig, axes = plt.subplots(1, 2, figsize=(6, 3))
+            img_orig = x[0].cpu().permute(1, 2, 0).numpy()
+            img_adv = x_adv[0].cpu().permute(1, 2, 0).numpy()
+            if img_orig.shape[-1] == 1:
+                img_orig = img_orig.squeeze(-1)
+                img_adv = img_adv.squeeze(-1)
+                axes[0].imshow(img_orig, cmap="gray")
+                axes[1].imshow(img_adv, cmap="gray")
+            else:
+                axes[0].imshow(img_orig)
+                axes[1].imshow(img_adv)
+            axes[0].set_title(f"Original\\nPred: {{orig_pred.item()}}")
+            axes[1].set_title(f"Adversarial\\nPred: {{adv_pred.item()}}")
+            axes[0].axis("off")
+            axes[1].axis("off")
+            fig.tight_layout()
+            fig.savefig(OUTPUT_DIR / "before_after.png", dpi=150)
+            plt.close()
+            print(f"Saved comparison image to {{OUTPUT_DIR / 'before_after.png'}}")
+        except Exception as e:
+            print(f"Could not save comparison image: {{e}}")
 
     np.save(OUTPUT_DIR / "x_adv.npy", x_adv.cpu().numpy())
     np.save(OUTPUT_DIR / "y.npy", y.cpu().numpy())
@@ -499,7 +543,8 @@ def main():
         "num_samples": len(x),
     }}
     (OUTPUT_DIR / "summary.json").write_text(json.dumps(summary, indent=2))
-    print(f"Saved results to {{OUTPUT_DIR}}")
+    print(f"\\nSaved results to {{OUTPUT_DIR}}")
+    print("Next: open the folder above to see adversarial examples and summary.json")
 
 if __name__ == "__main__":
     main()
@@ -584,7 +629,9 @@ def main():
     out_path = Path("generated_attack.py")
     out_path.write_text(script)
     print(f"\nGenerated script written to: {out_path.resolve()}")
-    print("Run it with: python generated_attack.py")
+    print("Next step: run it with")
+    print(f"  python {out_path.name}")
+    print("Results will be saved in the output folder you chose.")
 
     Path("generated_config.json").write_text(json.dumps(config, indent=2))
     print("Config saved to generated_config.json")
