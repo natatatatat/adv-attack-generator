@@ -197,8 +197,8 @@ def build_model():
         model_code = '''
 def build_model():
     from torchvision import models
-    model = models.resnet18(weights=None)
-    # Adjust final layer if needed (default is 1000 for ImageNet)
+    # Downloads ImageNet pretrained weights if no local file is provided
+    model = models.resnet18(weights="DEFAULT")
     return model
 '''
     elif model_type == "pretrained_custom":
@@ -381,7 +381,33 @@ def attack(model, x, y, epsilon={epsilon}, step_size={step_size}, steps={steps})
         model.load_state_dict(torch.load("{model_path}", map_location="cpu"))
         print("Loaded weights from {model_path}")
     else:
-        print("WARNING: weights file not found, using random weights")
+        print("Weights file not found. Training a quick model instead...")
+        train_quick(model, x, y)
+'''
+    else:
+        # No weights provided: train quickly unless it's already a pretrained torchvision model
+        if model_type != "resnet18":
+            load_weights = '''
+    print("No weights file provided. Training a quick model on the data...")
+    train_quick(model, x, y)
+'''
+
+    train_fn = '''
+def train_quick(model, x, y, epochs=3, lr=0.01):
+    """Short training so the model is not random."""
+    model.train()
+    opt = torch.optim.Adam(model.parameters(), lr=lr)
+    loss_fn = nn.CrossEntropyLoss()
+    # Use a small subset if data is large
+    n = min(len(x), 500)
+    x_t, y_t = x[:n], y[:n]
+    for epoch in range(epochs):
+        opt.zero_grad()
+        loss = loss_fn(model(x_t), y_t)
+        loss.backward()
+        opt.step()
+        print(f"  quick train epoch {epoch+1}/{epochs} loss={loss.item():.4f}")
+    model.eval()
 '''
 
     script = f'''#!/usr/bin/env python3
@@ -409,6 +435,8 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 {attack_fn}
 
+{train_fn}
+
 def evaluate(model, x, y):
     model.eval()
     with torch.no_grad():
@@ -416,13 +444,13 @@ def evaluate(model, x, y):
         return (preds == y).float().mean().item()
 
 def main():
-    model = build_model()
-{load_weights}
-    model.eval()
-
     print("Loading data...")
     x, y = load_data()
     print(f"Loaded {{len(x)}} sample(s), shape {{tuple(x.shape)}}")
+
+    model = build_model()
+{load_weights}
+    model.eval()
 
     # Original prediction
     with torch.no_grad():
@@ -549,4 +577,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
