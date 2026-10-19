@@ -2,6 +2,40 @@
 
 Interactive tool that generates a ready-to-run adversarial attack script.
 
+## Environment Setup
+
+### 1. Create a virtual environment (recommended)
+
+```bash
+# macOS / Linux
+python3 -m venv venv
+source venv/bin/activate
+
+# Windows
+python -m venv venv
+venv\Scripts\activate
+```
+
+### 2. Upgrade pip
+
+```bash
+pip install --upgrade pip
+```
+
+### 3. Install dependencies
+
+```bash
+pip install torch torchvision numpy pillow
+```
+
+> **GPU (optional):** If you have an NVIDIA GPU and want CUDA support, install the matching PyTorch build from [pytorch.org](https://pytorch.org).
+
+### 4. Verify
+
+```bash
+python -c "import torch; print(torch.__version__)"
+```
+
 ## Quick Start
 
 ```bash
@@ -43,12 +77,6 @@ python generated_attack.py
 | custom | Paste your own model code. |
 
 You can optionally provide a `.pt` weights file for any model.
-
-## Requirements
-
-```bash
-pip install torch torchvision numpy pillow
-```
 
 ## Single-image mode
 
