@@ -238,9 +238,24 @@ def load_data():
     elif dataset_type == "sklearn_digits":
         data_code = f'''
 def load_data():
-    x = torch.tensor(np.load("data/processed/x_test.npy")).float()[:{num_samples}]
-    y = torch.tensor(np.load("data/processed/y_test.npy")).long()[:{num_samples}]
-    return x, y
+    """Load digits. Generates them with sklearn if lab files are missing."""
+    from pathlib import Path
+    x_path = Path("data/processed/x_test.npy")
+    y_path = Path("data/processed/y_test.npy")
+    if x_path.exists() and y_path.exists():
+        x = torch.tensor(np.load(x_path)).float()[:{num_samples}]
+        y = torch.tensor(np.load(y_path)).long()[:{num_samples}]
+        return x, y
+    print("Lab files not found. Generating digits with sklearn...")
+    from sklearn.datasets import load_digits
+    from sklearn.model_selection import train_test_split
+    digits = load_digits()
+    x = digits.images.astype("float32") / 16.0
+    x = x[:, None, :, :]
+    y = digits.target.astype("int64")
+    _, x_test, _, y_test = train_test_split(x, y, test_size=0.2, random_state=42)
+    n = min({num_samples}, len(x_test))
+    return torch.tensor(x_test[:n]), torch.tensor(y_test[:n])
 '''
     elif dataset_type == "mnist":
         data_code = f'''
