@@ -83,10 +83,14 @@ MODELS = {
         "description": "ResNet-18 (torchvision). Common pretrained model for ImageNet or fine-tuned CIFAR.",
     },
     "5": {
+        "name": "h5_keras",
+        "description": "Load a Keras/TensorFlow .h5 model file (requires tensorflow).",
+    },
+    "6": {
         "name": "pretrained_custom",
         "description": "Load your own .pt weights. You must match the architecture in the generated script.",
     },
-    "6": {
+    "7": {
         "name": "custom",
         "description": "You will paste your own model architecture.",
     },
@@ -165,9 +169,10 @@ def build_model():
     )
 '''
     elif model_type == "cnn_small":
-        model_code = '''
+        in_ch = 1 if config.get("color_mode", "RGB") == "L" else 3
+        model_code = f'''
 class SmallCNN(nn.Module):
-    def __init__(self, in_channels=1, num_classes=10):
+    def __init__(self, in_channels={in_ch}, num_classes=10):
         super().__init__()
         self.features = nn.Sequential(
             nn.Conv2d(in_channels, 16, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2),
@@ -183,7 +188,7 @@ class SmallCNN(nn.Module):
         return self.fc(x)
 
 def build_model():
-    return SmallCNN(in_channels=1, num_classes=10)
+    return SmallCNN(in_channels={in_ch}, num_classes=10)
 '''
     elif model_type == "cnn_cifar":
         model_code = '''
@@ -214,38 +219,68 @@ def build_model():
     model = models.resnet18(weights="DEFAULT")
     return model
 '''
+    elif model_type == "h5_keras":
+        model_code = '''
+def build_model():
+    # Keras .h5 models are loaded separately
+    return None
+'''
     elif model_type == "pretrained_custom":
         model_code = '''
 def build_model():
-    # TODO: Define the architecture that matches your .pt weights.
-    # Example:
-    return nn.Sequential(
-        nn.Flatten(),
-        nn.Linear(64, 128),
-        nn.ReLU(),
-        nn.Linear(128, 10),
+    # USER: Update this section to match your .pt model architecture.
+    # Example (edit input size and layers to match your model):
+    # return nn.Sequential(
+    #     nn.Flatten(),
+    #     nn.Linear(64, 128),
+    #     nn.ReLU(),
+    #     nn.Linear(128, 10),
+    # )
+    raise NotImplementedError(
+        "Update build_model() with your architecture before running. "
+        "See the example in the comments above."
     )
 '''
     else:
         model_code = '''
 def build_model():
-    # TODO: Replace with your model architecture
-    raise NotImplementedError("Provide your model")
+    # USER: Update this section with your model code.
+    # Example:
+    # class MyModel(nn.Module):
+    #     def __init__(self):
+    #         super().__init__()
+    #         self.net = nn.Sequential(nn.Flatten(), nn.Linear(784, 10))
+    #     def forward(self, x):
+    #         return self.net(x)
+    # return MyModel()
+    raise NotImplementedError(
+        "Update build_model() with your model before running. "
+        "See the example in the comments above."
+    )
 '''
 
     # ---------- Data ----------
     if single_image:
+        color_mode = config.get("color_mode", "RGB")
         data_code = f'''
 def load_data():
     from PIL import Image
     import torchvision.transforms as T
-    img = Image.open("{single_image_path}").convert("RGB")
-    transform = T.Compose([
-        T.Resize(({single_image_size}, {single_image_size})),
-        T.ToTensor(),
-    ])
-    x = transform(img).unsqueeze(0)          # shape (1, C, H, W)
-    y = torch.tensor([0])                    # dummy label (not used for targeted)
+    img = Image.open("{single_image_path}")
+    mode = "{color_mode}"
+    size = {single_image_size}
+    if mode == "L":
+        img = img.convert("L")
+    elif mode == "RGB":
+        img = img.convert("RGB")
+    # else keep original mode
+    transforms = []
+    if size > 0:
+        transforms.append(T.Resize((size, size)))
+    transforms.append(T.ToTensor())
+    transform = T.Compose(transforms)
+    x = transform(img).unsqueeze(0)
+    y = torch.tensor([0])
     return x, y
 '''
     elif dataset_type == "sklearn_digits":
@@ -403,7 +438,14 @@ def attack(model, x, y, epsilon={epsilon}, step_size={step_size}, steps={steps})
 '''
 
     load_weights = ""
-    if model_path:
+    if model_type == "h5_keras" and model_path:
+        load_weights = f'''
+    import tensorflow as tf
+    print("Loading Keras .h5 model from {model_path}...")
+    model = tf.keras.models.load_model("{model_path}")
+    print("Loaded .h5 model. Attack will use TensorFlow gradients.")
+'''
+    elif model_path:
         load_weights = f'''
     if Path("{model_path}").exists():
         model.load_state_dict(torch.load("{model_path}", map_location="cpu"))
@@ -446,8 +488,13 @@ Generated Adversarial Attack Script
 Attack : {attack}
 Targeted: {targeted}
 Epsilon: {epsilon}
-{"Target class: " + str(target_class) if targeted else ""}
-Dataset: {dataset_type}
+{"Target class number: " + str(target_class) if targeted else ""}
+
+CLASS NUMBERS:
+Update the target class number to match your model.
+Examples:
+  CIFAR-10: 0=airplane, 1=car, 3=cat, 5=dog, 7=horse
+  ImageNet: look up the class index for the label you want
 """
 
 import torch
@@ -576,7 +623,11 @@ def main():
     targeted = yes_no("Targeted attack?", default=False)
     target_class = None
     if targeted:
-        target_class = prompt_int("Target class", 7)
+        print("Class numbers depend on the model.")
+        print("Example: for CIFAR-10, 0=plane, 1=car, 3=cat, 5=dog, 7=horse.")
+        print("Example: for ImageNet, look up the class index (e.g. 207 can be a dog breed).")
+        print("Update the target class number below to match your model.")
+        target_class = prompt_int("Target class number", 7)
 
     epsilon = prompt_float("Max perturbation epsilon (0.0-1.0)", 0.1)
 
@@ -586,13 +637,25 @@ def main():
         steps = prompt_int("Number of steps", 10)
         step_size = prompt_float("Step size", round(epsilon / 4, 4))
 
+    # Model selection
+    print("\nModel options:")
+    print("  - Pick a built-in model (MLP, CNN, ResNet-18)")
+    print("  - ResNet-18 will download pretrained ImageNet weights if you don't provide a file")
+    print("  - Or provide your own .pt / .h5 file")
     model_choice = choose(MODELS, "Choose model:")
     model_type = MODELS[model_choice]["name"]
     model_path = ""
 
-    # Optional weights for any model
-    if model_type in ("pretrained_custom", "resnet18") or yes_no("Load model weights from a .pt file?", default=False):
-        model_path = prompt("Path to weights file (.pt)", "")
+    if model_type == "h5_keras":
+        model_path = prompt("Path to .h5 model file")
+        print("Note: .h5 models are loaded with TensorFlow. The attack will use a TensorFlow gradient path.")
+    elif model_type == "resnet18":
+        if yes_no("Download pretrained ImageNet weights for ResNet-18?", default=True):
+            model_path = ""  # signals download
+        else:
+            model_path = prompt("Path to .pt weights (or leave blank)", "")
+    elif model_type in ("pretrained_custom",) or yes_no("Load weights from a .pt file?", default=False):
+        model_path = prompt("Path to .pt weights file", "")
 
     dataset_choice = choose(DATASETS, "Choose dataset:")
     dataset_type = DATASETS[dataset_choice]["name"]
@@ -614,13 +677,40 @@ def main():
     single_image_path = ""
     single_image_size = 32
     if single_image:
+        if model_type == "mlp_digits":
+            print("Note: mlp_digits only works with 8x8 images.")
+            if yes_no("Use ResNet-18 (downloads pretrained weights) instead?", default=True):
+                model_type = "resnet18"
+                model_path = ""
+            elif yes_no("Use a flexible CNN instead?", default=True):
+                model_type = "cnn_small"
+        if model_type not in ("resnet18", "h5_keras", "pretrained_custom") and not model_path:
+            print("Warning: no pretrained model selected. Single-image attacks work best with a pretrained model.")
+            if yes_no("Download ResNet-18 pretrained weights?", default=True):
+                model_type = "resnet18"
+                model_path = ""
         single_image_path = prompt("Path to the image file")
-        single_image_size = prompt_int("Resize image to this size (square)", 32)
+        if yes_no("Resize the image?", default=True):
+            single_image_size = prompt_int("Resize to this square size", 32)
+        else:
+            single_image_size = 0  # 0 means keep original size
+        color_choice = choose(
+            {"1": {"name": "RGB", "description": "Color (3 channels)"},
+             "2": {"name": "L", "description": "Grayscale (1 channel)"},
+             "3": {"name": "keep", "description": "Keep original color mode"}},
+            "Image color mode:"
+        )
+        color_mode = {"1": "RGB", "2": "L", "3": "keep"}[color_choice]
         if not targeted:
-            print("Single-image mode works best as a targeted attack.")
-            if yes_no("Switch to targeted?", default=True):
+            print("You can force a specific target class, or just make the model predict something else.")
+            if yes_no("Force a specific target class?", default=False):
                 targeted = True
-                target_class = prompt_int("Target class", 0)
+                target_class = prompt_int("Target class number", 0)
+            else:
+                print("Will try to change the prediction away from the original class.")
+    else:
+        color_mode = "RGB"
+        single_image_size = 32
 
     image_folder = ""
     image_size = 28
@@ -646,6 +736,7 @@ def main():
         "single_image": single_image,
         "single_image_path": single_image_path,
         "single_image_size": single_image_size,
+        "color_mode": color_mode,
         "num_samples": num_samples,
         "output_dir": output_dir,
     }
