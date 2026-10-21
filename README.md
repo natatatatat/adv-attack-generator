@@ -18,7 +18,7 @@ venv\Scripts\activate
 
 ```bash
 pip install --upgrade pip
-pip install torch torchvision numpy pillow scikit-learn
+pip install torch torchvision numpy pillow scikit-learn matplotlib
 ```
 
 ### Kali Linux on Apple Silicon (M1/M2/M3/M5) — important
@@ -42,7 +42,7 @@ source venv/bin/activate
 
 # Install packages
 pip install --upgrade pip
-pip install torch torchvision numpy pillow scikit-learn
+pip install torch torchvision numpy pillow scikit-learn matplotlib
 
 # Make the OpenBLAS fix permanent
 echo 'export OPENBLAS_CORETYPE=ARMV8' >> venv/bin/activate
@@ -102,8 +102,7 @@ You can optionally provide a `.pt` weights file for any model.
 
 ## Single-image mode
 
-When prompted, you can choose to attack **one uploaded image** instead of a full dataset.
-
-- Provide the path to the image.
-- Choose a target class.
-- The generated script loads that image, shows the original prediction, runs the attack, and shows the new prediction.
+- Provide an image path.
+- Resizing is optional (choose a size or keep the original).
+- Color mode: RGB, grayscale, or keep original.
+- Optionally force a specific target class, or just change the prediction to anything else.
