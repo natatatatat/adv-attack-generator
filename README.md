@@ -1,6 +1,11 @@
 # Adversarial Attack Script Generator
 
-Interactive tool that generates a ready-to-run adversarial attack script.
+Interactive tool that generates a ready-to-run adversarial attack script from simple prompts.  
+No need to write the attack code yourself — choose the attack, model, and dataset, then run the generated script.
+
+> **Note:** This is a personal project for learning and authorized testing only.  
+> It is not related to my employer and was built outside of work.  
+> Use it only on models and data you are allowed to test.
 
 ## Environment Setup
 
@@ -18,10 +23,12 @@ venv\Scripts\activate
 
 ```bash
 pip install --upgrade pip
-pip install torch torchvision numpy pillow scikit-learn matplotlib
+pip install torch torchvision numpy pillow scikit-learn
 ```
 
-### Kali Linux on Apple Silicon (M1/M2/M3/M5) — important
+Pillow is enough for the before/after images. Matplotlib is optional.
+
+### Kali Linux on Apple Silicon (M1/M2/M3/M5)
 
 If you see:
 
@@ -32,19 +39,15 @@ zsh: illegal hardware instruction  python -c "import torch; ..."
 Use **Python 3.13** (3.14 wheels are unstable on aarch64) and set the OpenBLAS workaround:
 
 ```bash
-# Install Python 3.13
 sudo apt update
 sudo apt install python3.13 python3.13-venv python3.13-dev -y
 
-# Create environment
 python3.13 -m venv venv
 source venv/bin/activate
 
-# Install packages
 pip install --upgrade pip
-pip install torch torchvision numpy pillow scikit-learn matplotlib
+pip install torch torchvision numpy pillow scikit-learn
 
-# Make the OpenBLAS fix permanent
 echo 'export OPENBLAS_CORETYPE=ARMV8' >> venv/bin/activate
 deactivate
 source venv/bin/activate
@@ -71,8 +74,8 @@ Answer the prompts. It writes:
 
 It also creates these folders in the **same directory**:
 
-- `orig_samples/` — will hold the original images
-- `adversarial_samples/` — will hold the adversarial images
+- `orig_samples/` — original images
+- `adversarial_samples/` — adversarial images
 
 Then run:
 
@@ -88,9 +91,11 @@ After the attack finishes you will have:
 ├── generated_attack.py
 ├── orig_samples/            # original images
 ├── adversarial_samples/     # adversarial images
-├── before_after.png         # side-by-side comparison
+├── before_after.png         # top = original, bottom = adversarial
 └── summary.json             # accuracy before and after
 ```
+
+`before_after.png` is saved next to the script (Pillow only, no matplotlib required).
 
 ## Attacks
 
@@ -101,13 +106,15 @@ After the attack finishes you will have:
 | PGD | Projected Gradient Descent (BIM with random start) |
 | DeepFool | Finds a small perturbation that changes the prediction |
 
+## Datasets
+
 | Dataset | Description |
 |---------|-------------|
-| sklearn_digits | 8×8 grayscale digits (0-9). Uses local lab files. Fast. |
+| sklearn_digits | 8×8 grayscale digits (0–9). Uses local lab files if present, otherwise generates them. |
 | MNIST | 28×28 grayscale handwritten digits. Downloads automatically. |
 | CIFAR-10 | 32×32 color images, 10 classes. Downloads automatically. |
 | CIFAR-100 | 32×32 color images, 100 classes. Downloads automatically. |
-| ImageNet | Large-scale 1000-class images. Needs local data or uses a demo subset. |
+| ImageNet | Large-scale 1000-class images. Needs local data or uses a small demo subset. |
 | image_folder | Your own images in class subfolders (`0/`, `1/`, …). |
 | custom | Edit `load_data()` yourself. |
 
@@ -118,24 +125,25 @@ After the attack finishes you will have:
 | mlp_digits | Simple MLP for 8×8 digits. |
 | cnn_small | Small CNN with adaptive pooling (grayscale). |
 | cnn_cifar | Small CNN for 32×32 color images (CIFAR). |
-| resnet18 | torchvision ResNet-18 (ImageNet-style). |
-| pretrained_custom | Load your own `.pt` weights (match the architecture). |
+| resnet18 | torchvision ResNet-18. Downloads ImageNet weights if you do not provide a file. |
+| h5_keras | Load a Keras/TensorFlow `.h5` model (requires TensorFlow). |
+| pretrained_custom | Load your own `.pt` weights (you must match the architecture). |
 | custom | Paste your own model code. |
 
-You can optionally provide a `.pt` weights file for any model.
+You can provide a `.pt` weights file for most models. ResNet-18 can download pretrained weights for you.
 
 ## Single-image mode
 
-- Provide an image path.
+- Provide a path to one image.
 - Resizing is optional (choose a size or keep the original).
 - Color mode: RGB, grayscale, or keep original.
 - Optionally force a specific target class, or just change the prediction to anything else.
 
-## Example: CIFAR-10 that actually fools the model
+## Example: CIFAR-10 that fools the model
 
 This example uses PGD on CIFAR-10. With these settings the attack changes most predictions.
 
-### Every prompt (copy these answers)
+### Every prompt
 
 ```
 Choose attack type:                          3
@@ -159,50 +167,42 @@ python generate_attack.py
 python generated_attack.py
 ```
 
-CIFAR-10 downloads automatically.
+CIFAR-10 downloads automatically into a `data/` folder the first time.
 
-### Why the first try may not fool the model
+### If the attack looks weak
 
-The generated script only quick-trains for 8 epochs. That is often too weak on CIFAR-10.
-
-**After generating the script, open `generated_attack.py` and change:**
-
-```python
-def train_quick(model, x, y, epochs=8, lr=0.001):
-```
-
-to:
+The script quick-trains the model. If predictions barely change, open `generated_attack.py` and increase training:
 
 ```python
 def train_quick(model, x, y, epochs=20, lr=0.001):
 ```
 
-Then run `python generated_attack.py` again.
+Change `20` to `30` if needed, then run the script again.
 
 ### What you should see
 
 - Clean accuracy around 30–50%
 - Adversarial accuracy much lower (often near 0%)
-- Line like: `Result: attack changed the prediction on 50%+ of samples.`
+- A line like: `Result: attack changed the prediction on 50%+ of samples.`
 - `Attack was effective.`
 
-### Results folder
+### Results
 
 ```
 orig_samples/            # original images
 adversarial_samples/     # adversarial images
-before_after.png         # top = original, bottom = adversarial
+before_after.png         # top row = original, bottom row = adversarial
 summary.json
 ```
 
-### CIFAR-10 class numbers (if you use a targeted attack)
+### CIFAR-10 class numbers (for targeted attacks)
 
-| Number | Class     | Number | Class  |
-|--------|-----------|--------|--------|
-| 0      | airplane  | 5      | dog    |
-| 1      | automobile| 6      | frog   |
-| 2      | bird      | 7      | horse  |
-| 3      | cat       | 8      | ship   |
-| 4      | deer      | 9      | truck  |
+| Number | Class      | Number | Class  |
+|--------|------------|--------|--------|
+| 0      | airplane   | 5      | dog    |
+| 1      | automobile | 6      | frog   |
+| 2      | bird       | 7      | horse  |
+| 3      | cat        | 8      | ship   |
+| 4      | deer       | 9      | truck  |
 
-For a targeted example, answer `y` to “Targeted attack?” and enter a class number (e.g. `5` for dog).
+For a targeted attack, answer `y` to “Targeted attack?” and enter a class number (for example `5` for dog).
