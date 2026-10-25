@@ -233,19 +233,21 @@ The script tries to push predictions toward class 5 (dog). Check `before_after.p
 
 ## Example: Upload your own image (this changes the class)
 
-This example was tested on a pug photo. ResNet-18 predicted class **254** (pug). After the attack it predicted class **850**.
+This example was tested on a pug photo. With ResNet-18 and epsilon `0.05`, the class changed (254 → another class).
+
+**Important:** use the latest `generate_attack.py`. It normalizes ResNet inputs correctly so the pretrained model can be fooled.
 
 ### Every prompt
 
 ```
 Choose attack type:                          1
 Targeted attack? [y/N]:                      n
-Max perturbation epsilon (0.0-1.0) [0.1]:    0.03
+Max perturbation epsilon (0.0-1.0) [0.1]:    0.05
 Choose model:                                4
 Download pretrained ImageNet weights? [Y/n]: y
 Choose dataset:                              3
 Attack a single uploaded image? [y/N]:       y
-Path to the image file:                      /path/to/your/dog.jpg
+Path to the image file:                      /path/to/your/image.jpg
 Resize the image? [Y/n]:                     y
 Resize to this square size [32]:             224
 Image color mode:                            1
@@ -266,8 +268,8 @@ python generated_attack.py
 
 ```
 Original prediction(s): [254]
-Adversarial prediction(s): [850]
-Result: image changed from class 254 to class 850
+Adversarial prediction(s): [182]
+Result: image changed from class 254 to class 182
 Attack succeeded on this image.
 Saved comparison grid to .../before_after.png
 ```
@@ -278,12 +280,13 @@ The numbers will differ for your image. The important part is that the class **c
 
 - `orig_samples/` — your original image
 - `adversarial_samples/` — attacked image
-- `before_after.png` — side by side
+- `before_after.png` — side by side (top = original, bottom = adversarial)
 
 ### If the class does not change
 
-- Raise epsilon to `0.05` or `0.1`
-- Or switch to PGD (attack type `3`) with 10 steps and step size `0.01`
-- Make sure you chose model `4` (ResNet-18) and downloaded the weights
+- Raise epsilon to `0.08` or `0.1`
+- Or use PGD (attack type `3`) with 10 steps and step size `0.01`
+- Make sure you chose model `4` (ResNet-18) and said yes to downloading weights
+- Re-generate the script after updating `generate_attack.py` so normalization is included
 
 ImageNet class 254 is a pug. Other images will have different original class numbers. That is normal.
