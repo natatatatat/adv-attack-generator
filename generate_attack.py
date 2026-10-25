@@ -17,8 +17,9 @@ from typing import Any
 
 ATTACKS = {
     "1": {"name": "FGSM", "description": "Fast Gradient Sign Method (single step)"},
-    "2": {"name": "I-FGSM", "description": "Iterative FGSM"},
-    "3": {"name": "PGD", "description": "Projected Gradient Descent"},
+    "2": {"name": "I-FGSM/BIM", "description": "Iterative FGSM / Basic Iterative Method"},
+    "3": {"name": "PGD", "description": "Projected Gradient Descent (BIM with random start)"},
+    "4": {"name": "DeepFool", "description": "Minimal perturbation to cross the decision boundary"},
 }
 
 # Compatible pairs (model_type, dataset_type)
@@ -154,7 +155,7 @@ def generate_script(config: dict[str, Any]) -> str:
     single_image = config.get("single_image", False)
     single_image_path = config.get("single_image_path", "")
     single_image_size = config.get("single_image_size", 32)
-    output_dir = config.get("output_dir", "artifacts/generated_attack")
+    output_dir = config.get("output_dir", ".")
     num_samples = config.get("num_samples", 200)
 
     # ---------- Model ----------
@@ -422,7 +423,43 @@ def attack(model, x, y, epsilon={epsilon}):
     x_adv = x {sign} epsilon * grad_sign
     return torch.clamp(x_adv, 0, 1).detach()
 '''
-    else:  # I-FGSM and PGD
+    elif attack == "DeepFool":
+        attack_fn = '''
+def attack(model, x, y, max_iter=20, overshoot=0.02):
+    """DeepFool: small perturbation that changes the prediction."""
+    model.eval()
+    x_adv = x.clone().detach()
+    for i in range(x_adv.shape[0]):
+        xi = x_adv[i:i+1].clone().detach().requires_grad_(True)
+        for _ in range(max_iter):
+            logits = model(xi)
+            pred = int(logits.argmax(1).item())
+            model.zero_grad()
+            logits[0, pred].backward(retain_graph=True)
+            grad_pred = xi.grad.detach().clone()
+            best_pert = float("inf")
+            r_best = None
+            for k in range(logits.shape[1]):
+                if k == pred:
+                    continue
+                if xi.grad is not None:
+                    xi.grad.zero_()
+                logits[0, k].backward(retain_graph=True)
+                w = xi.grad.detach().clone() - grad_pred
+                f = float((logits[0, k] - logits[0, pred]).item())
+                pert = abs(f) / (w.norm() + 1e-8)
+                if pert < best_pert:
+                    best_pert = pert
+                    r_best = (abs(f) / (w.norm() ** 2 + 1e-8)) * w
+            if r_best is None:
+                break
+            xi = torch.clamp(xi + (1 + overshoot) * r_best, 0, 1).detach().requires_grad_(True)
+            if int(model(xi).argmax(1).item()) != pred:
+                break
+        x_adv[i] = xi.detach().clamp(0, 1)
+    return x_adv
+'''
+    else:  # I-FGSM/BIM and PGD
         attack_fn = f'''
 def attack(model, x, y, epsilon={epsilon}, step_size={step_size}, steps={steps}):
     x_adv = x.clone().detach()
@@ -571,8 +608,8 @@ def main():
     # Save individual images
     orig_dir = OUTPUT_DIR / "orig_samples"
     adv_dir = OUTPUT_DIR / "adversarial_samples"
-    orig_dir.mkdir(exist_ok=True)
-    adv_dir.mkdir(exist_ok=True)
+    orig_dir.mkdir(parents=True, exist_ok=True)
+    adv_dir.mkdir(parents=True, exist_ok=True)
 
     def save_images(tensor, folder, prefix):
         from PIL import Image
@@ -662,7 +699,7 @@ def main():
 
     steps = 10
     step_size = epsilon / 4
-    if attack in ("I-FGSM", "PGD"):
+    if attack in ("I-FGSM/BIM", "PGD"):
         steps = prompt_int("Number of steps", 10)
         step_size = prompt_float("Step size", round(epsilon / 4, 4))
 
@@ -748,7 +785,7 @@ def main():
         image_size = prompt_int("Resize images to this size", 28)
 
     num_samples = 1 if single_image else prompt_int("Max number of samples to attack", 200)
-    output_dir = "artifacts/generated_attack"
+    output_dir = "."
 
     config = {
         "attack": attack,
@@ -776,10 +813,17 @@ def main():
     print(f"\nGenerated script written to: {out_path.resolve()}")
     print("Next step: run it with")
     print(f"  python {out_path.name}")
-    print("Results will be saved in artifacts/generated_attack/")
-    print("  orig_samples/          — original images")
-    print("  adversarial_samples/   — adversarial images")
-    print("  before_after.png       — comparison")
+
+    # Create result folders now so they exist before the attack runs
+    out = Path(output_dir).resolve()
+    (out / "orig_samples").mkdir(parents=True, exist_ok=True)
+    (out / "adversarial_samples").mkdir(parents=True, exist_ok=True)
+    print(f"\nCreated folders:")
+    print(f"  {out / 'orig_samples'}")
+    print(f"  {out / 'adversarial_samples'}")
+    print("Run the attack script to fill them with images.")
+    print("A before_after.png comparison will also be saved in:")
+    print(f"  {out}")
 
     Path("generated_config.json").write_text(json.dumps(config, indent=2))
     print("Config saved to generated_config.json")
