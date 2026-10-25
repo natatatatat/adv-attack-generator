@@ -69,20 +69,37 @@ Answer the prompts. It writes:
 - `generated_attack.py` — the attack script
 - `generated_config.json` — your choices
 
+It also creates these folders in the **same directory**:
+
+- `orig_samples/` — will hold the original images
+- `adversarial_samples/` — will hold the adversarial images
+
 Then run:
 
 ```bash
 python generated_attack.py
 ```
 
-Results are always saved under `artifacts/generated_attack/`:
+After the attack finishes you will have:
 
-- `orig_samples/` — original images
-- `adversarial_samples/` — adversarial images
-- `before_after.png` — side-by-side comparison of the first few
-- `summary.json` — accuracy before and after
+```
+.
+├── generate_attack.py
+├── generated_attack.py
+├── orig_samples/            # original images
+├── adversarial_samples/     # adversarial images
+├── before_after.png         # side-by-side comparison
+└── summary.json             # accuracy before and after
+```
 
-## Datasets
+## Attacks
+
+| Attack | Description |
+|--------|-------------|
+| FGSM | Single-step Fast Gradient Sign Method |
+| I-FGSM / BIM | Iterative FGSM (also called Basic Iterative Method) |
+| PGD | Projected Gradient Descent (BIM with random start) |
+| DeepFool | Finds a small perturbation that changes the prediction |
 
 | Dataset | Description |
 |---------|-------------|
