@@ -630,6 +630,8 @@ def main():
 
     # Side-by-side comparison for the first few
     try:
+        import matplotlib
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         n_show = min(5, len(x))
         fig, axes = plt.subplots(2, n_show, figsize=(2 * n_show, 4))
@@ -650,11 +652,14 @@ def main():
             axes[0, i].axis("off")
             axes[1, i].axis("off")
         fig.tight_layout()
-        fig.savefig(OUTPUT_DIR / "before_after.png", dpi=150)
+        out_path = Path("before_after.png").resolve()
+        fig.savefig(out_path, dpi=150)
         plt.close()
-        print(f"Saved comparison grid to {{OUTPUT_DIR / 'before_after.png'}}")
+        print(f"Saved comparison grid to {{out_path}}")
     except Exception as e:
         print(f"Could not save comparison grid: {{e}}")
+        import traceback
+        traceback.print_exc()
 
     np.save(OUTPUT_DIR / "x_adv.npy", x_adv.cpu().numpy())
     np.save(OUTPUT_DIR / "y.npy", y.cpu().numpy())
