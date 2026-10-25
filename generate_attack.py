@@ -588,11 +588,14 @@ def main():
         orig_pred = model(x).argmax(1)
     print(f"Original prediction(s): {{orig_pred.tolist()}}")
 
+    # For a single image, attack the class the model actually predicted
+    attack_labels = orig_pred if len(x) == 1 else y
+
     clean_acc = evaluate(model, x, y)
     print(f"Clean accuracy (vs labels): {{clean_acc:.4f}}")
 
     print("Running attack...")
-    x_adv = attack(model, x, y)
+    x_adv = attack(model, x, attack_labels)
 
     with torch.no_grad():
         adv_pred = model(x_adv).argmax(1)
