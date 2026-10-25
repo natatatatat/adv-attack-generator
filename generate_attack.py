@@ -748,7 +748,7 @@ def main():
         image_size = prompt_int("Resize images to this size", 28)
 
     num_samples = 1 if single_image else prompt_int("Max number of samples to attack", 200)
-    output_dir = prompt("Output directory for results", "artifacts/generated_attack")
+    output_dir = "artifacts/generated_attack"
 
     config = {
         "attack": attack,
@@ -776,7 +776,10 @@ def main():
     print(f"\nGenerated script written to: {out_path.resolve()}")
     print("Next step: run it with")
     print(f"  python {out_path.name}")
-    print("Results will be saved in the output folder you chose.")
+    print("Results will be saved in artifacts/generated_attack/")
+    print("  orig_samples/          — original images")
+    print("  adversarial_samples/   — adversarial images")
+    print("  before_after.png       — comparison")
 
     Path("generated_config.json").write_text(json.dumps(config, indent=2))
     print("Config saved to generated_config.json")
