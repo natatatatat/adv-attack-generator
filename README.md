@@ -1,7 +1,7 @@
 # Adversarial Attack Script Generator
 
 Interactive tool that generates a ready-to-run adversarial attack script from simple prompts.  
-No need to write the attack code yourself: choose the attack, model, and dataset, then run the generated script.
+No need to write the attack code yourself — choose the attack, model, and dataset, then run the generated script.
 
 > **Note:** This is a personal project for learning and authorized testing only.  
 > It is not related to my employer and was built outside of work.  
@@ -26,6 +26,7 @@ pip install --upgrade pip
 pip install torch torchvision numpy pillow scikit-learn
 ```
 
+Pillow is enough for the before/after images. Matplotlib is optional.
 
 ### Kali Linux on Apple Silicon (M1/M2/M3/M5)
 
@@ -230,33 +231,27 @@ Then run `python generated_attack.py`.
 
 The script tries to push predictions toward class 5 (dog). Check `before_after.png` and the printed predictions.
 
-## Example: Upload your own image
+## Example: Upload your own image (this changes the class)
 
-Use this when you have a photo (cat, dog, etc.) and want to attack that one image.
-
-**Best results:** choose ResNet-18 so it downloads a pretrained model.
+This example was tested on a pug photo. ResNet-18 predicted class **254** (pug). After the attack it predicted class **850**.
 
 ### Every prompt
 
 ```
-Choose attack type:                          3
-Targeted attack? [y/N]:                      y
-Target class number [7]:                     5
-Max perturbation epsilon (0.0-1.0) [0.1]:    0.05
-Number of steps [10]:                        10
-Step size [0.0125]:                          0.01
+Choose attack type:                          1
+Targeted attack? [y/N]:                      n
+Max perturbation epsilon (0.0-1.0) [0.1]:    0.03
 Choose model:                                4
 Download pretrained ImageNet weights? [Y/n]: y
 Choose dataset:                              3
 Attack a single uploaded image? [y/N]:       y
-Use ResNet-18 instead? (if asked) [Y/n]:     y
-Path to the image file:                      /path/to/your/image.jpg
+Path to the image file:                      /path/to/your/dog.jpg
 Resize the image? [Y/n]:                     y
 Resize to this square size [32]:             224
 Image color mode:                            1
 ```
 
-Replace `/path/to/your/image.jpg` with your file (png or jpg).
+Use your own image path. PNG or JPG is fine.
 
 ### Run it
 
@@ -267,17 +262,28 @@ python generate_attack.py
 python generated_attack.py
 ```
 
-### What you get
+### What you should see
+
+```
+Original prediction(s): [254]
+Adversarial prediction(s): [850]
+Result: image changed from class 254 to class 850
+Attack succeeded on this image.
+Saved comparison grid to .../before_after.png
+```
+
+The numbers will differ for your image. The important part is that the class **changes**.
+
+### Files
 
 - `orig_samples/` — your original image
-- `adversarial_samples/` — the attacked image
-- `before_after.png` — side by side (top = original, bottom = adversarial)
+- `adversarial_samples/` — attacked image
+- `before_after.png` — side by side
 
-### Tips
+### If the class does not change
 
-- Use a clear photo (not a tiny icon)
-- ResNet-18 expects roughly 224×224 color images
-- Class numbers for ImageNet are different from CIFAR-10.  
-  Example ImageNet indexes: many dog breeds are in the 150–270 range.  
-  If you are unsure, start untargeted (`n`) so it just changes the prediction to anything else.
-- Epsilon `0.05` keeps the image looking similar. Increase to `0.1` if the class does not change.
+- Raise epsilon to `0.05` or `0.1`
+- Or switch to PGD (attack type `3`) with 10 steps and step size `0.01`
+- Make sure you chose model `4` (ResNet-18) and downloaded the weights
+
+ImageNet class 254 is a pug. Other images will have different original class numbers. That is normal.
