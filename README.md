@@ -75,6 +75,13 @@ Then run:
 python generated_attack.py
 ```
 
+Results are always saved under `artifacts/generated_attack/`:
+
+- `orig_samples/` — original images
+- `adversarial_samples/` — adversarial images
+- `before_after.png` — side-by-side comparison of the first few
+- `summary.json` — accuracy before and after
+
 ## Datasets
 
 | Dataset | Description |
