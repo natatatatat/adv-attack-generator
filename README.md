@@ -1,7 +1,7 @@
 # Adversarial Attack Script Generator
 
 Interactive tool that generates a ready-to-run adversarial attack script from simple prompts.  
-No need to write the attack code yourself — choose the attack, model, and dataset, then run the generated script.
+No need to write the attack code yourself, choose the attack, model, and dataset, then run the generated script.
 
 > **Note:** This is a personal project for learning and authorized testing only.  
 > It is not related to my employer and was built outside of work.  
@@ -26,7 +26,6 @@ pip install --upgrade pip
 pip install torch torchvision numpy pillow scikit-learn
 ```
 
-Pillow is enough for the before/after images. Matplotlib is optional.
 
 ### Kali Linux on Apple Silicon (M1/M2/M3/M5)
 
@@ -67,7 +66,6 @@ python -c "import torch; print(torch.__version__); print('OK')"
 python generate_attack.py
 ```
 
-Answer the prompts. It writes:
 
 - `generated_attack.py` — the attack script
 - `generated_config.json` — your choices
@@ -95,7 +93,7 @@ After the attack finishes you will have:
 └── summary.json             # accuracy before and after
 ```
 
-`before_after.png` is saved next to the script (Pillow only, no matplotlib required).
+`before_after.png` is saved next to the script.
 
 ## Attacks
 
