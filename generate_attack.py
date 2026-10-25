@@ -628,38 +628,31 @@ def main():
     print(f"Saved original images to {{orig_dir}}")
     print(f"Saved adversarial images to {{adv_dir}}")
 
-    # Side-by-side comparison for the first few
+    # Side-by-side comparison (works without matplotlib)
     try:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
+        from PIL import Image as PILImage
         n_show = min(5, len(x))
-        fig, axes = plt.subplots(2, n_show, figsize=(2 * n_show, 4))
-        if n_show == 1:
-            axes = axes.reshape(2, 1)
+        thumbs = []
         for i in range(n_show):
-            def to_disp(t):
+            def to_pil(t):
                 im = t.cpu()
                 if im.shape[0] == 1:
-                    return im.squeeze(0).numpy(), "gray"
-                return im.permute(1, 2, 0).numpy(), None
-            im0, cmap0 = to_disp(x[i])
-            im1, cmap1 = to_disp(x_adv[i])
-            axes[0, i].imshow(im0, cmap=cmap0)
-            axes[1, i].imshow(im1, cmap=cmap1)
-            axes[0, i].set_title(f"Orig {{orig_pred[i].item()}}")
-            axes[1, i].set_title(f"Adv {{adv_pred[i].item()}}")
-            axes[0, i].axis("off")
-            axes[1, i].axis("off")
-        fig.tight_layout()
+                    arr = (im.squeeze(0).numpy() * 255).clip(0, 255).astype("uint8")
+                    return PILImage.fromarray(arr, mode="L").convert("RGB")
+                arr = (im.permute(1, 2, 0).numpy() * 255).clip(0, 255).astype("uint8")
+                return PILImage.fromarray(arr, mode="RGB")
+            thumbs.append((to_pil(x[i]), to_pil(x_adv[i])))
+        w, h = thumbs[0][0].size
+        grid = PILImage.new("RGB", (w * n_show, h * 2), (255, 255, 255))
+        for i, (orig, adv) in enumerate(thumbs):
+            grid.paste(orig, (i * w, 0))
+            grid.paste(adv, (i * w, h))
         out_path = Path("before_after.png").resolve()
-        fig.savefig(out_path, dpi=150)
-        plt.close()
+        grid.save(out_path)
         print(f"Saved comparison grid to {{out_path}}")
+        print("Top row = original, bottom row = adversarial")
     except Exception as e:
         print(f"Could not save comparison grid: {{e}}")
-        import traceback
-        traceback.print_exc()
 
     np.save(OUTPUT_DIR / "x_adv.npy", x_adv.cpu().numpy())
     np.save(OUTPUT_DIR / "y.npy", y.cpu().numpy())
