@@ -130,3 +130,77 @@ You can optionally provide a `.pt` weights file for any model.
 - Resizing is optional (choose a size or keep the original).
 - Color mode: RGB, grayscale, or keep original.
 - Optionally force a specific target class, or just change the prediction to anything else.
+
+## Example: CIFAR-10 adversarial examples
+
+This walks through a full example that downloads CIFAR-10 and produces before/after images.
+
+### 1. Generate the attack script
+
+```bash
+python generate_attack.py
+```
+
+Use these answers:
+
+| Prompt | Answer |
+|--------|--------|
+| Attack type | `1` (FGSM) |
+| Targeted? | `n` |
+| Epsilon | `0.1` |
+| Model | `3` (cnn_cifar) |
+| Load weights? | `n` |
+| Dataset | `3` (cifar10) |
+| Single image? | `n` |
+| Max samples | `20` |
+
+### 2. Run the attack
+
+```bash
+python generated_attack.py
+```
+
+CIFAR-10 downloads automatically the first time. The script trains a small model, runs the attack, and saves results.
+
+### 3. Look at the results
+
+In the same folder you will have:
+
+```
+orig_samples/            # original CIFAR-10 images
+adversarial_samples/     # adversarial versions
+before_after.png         # side-by-side of the first few
+summary.json             # clean vs adversarial accuracy
+```
+
+Open `before_after.png` to see original vs adversarial.  
+The top row is the original images; the bottom row is after the attack.
+
+### 4. What you should see
+
+- Clean accuracy on the small set (often 30–70% after quick training)
+- Lower adversarial accuracy
+- A printed line like: `Result: attack changed the prediction on XX% of samples.`
+
+### CIFAR-10 class numbers (for targeted attacks)
+
+| Number | Class |
+|--------|-------|
+| 0 | airplane |
+| 1 | automobile |
+| 2 | bird |
+| 3 | cat |
+| 4 | deer |
+| 5 | dog |
+| 6 | frog |
+| 7 | horse |
+| 8 | ship |
+| 9 | truck |
+
+To force a specific class (for example “make it a dog”), choose targeted = `y` and enter `5`.
+
+### Tips for a stronger example
+
+- Use a larger epsilon (e.g. `0.2`) if the attack looks weak
+- Choose `PGD` (option 3) for a stronger iterative attack
+- Use more samples (e.g. `50`) for a clearer summary
