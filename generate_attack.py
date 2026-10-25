@@ -504,7 +504,7 @@ def attack(model, x, y, epsilon={epsilon}, step_size={step_size}, steps={steps})
 '''
 
     train_fn = '''
-def train_quick(model, x, y, epochs=8, lr=0.001):
+def train_quick(model, x, y, epochs=20, lr=0.001):
     """Train longer so the model learns real patterns."""
     model.train()
     opt = torch.optim.Adam(model.parameters(), lr=lr)
