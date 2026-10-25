@@ -131,76 +131,78 @@ You can optionally provide a `.pt` weights file for any model.
 - Color mode: RGB, grayscale, or keep original.
 - Optionally force a specific target class, or just change the prediction to anything else.
 
-## Example: CIFAR-10 adversarial examples
+## Example: CIFAR-10 that actually fools the model
 
-This walks through a full example that downloads CIFAR-10 and produces before/after images.
+This example uses PGD on CIFAR-10. With these settings the attack changes most predictions.
 
-### 1. Generate the attack script
+### Every prompt (copy these answers)
+
+```
+Choose attack type:                          3
+Targeted attack? [y/N]:                      n
+Max perturbation epsilon (0.0-1.0) [0.1]:    0.1
+Number of steps [10]:                        20
+Step size [0.025]:                           0.01
+Choose model:                                3
+Load weights from a .pt file? [y/N]:         n
+Choose dataset:                              3
+Attack a single uploaded image? [y/N]:       n
+Max number of samples to attack [200]:       50
+```
+
+### Run it
 
 ```bash
 python generate_attack.py
-```
+# enter the answers above
 
-Use these answers:
-
-| Prompt | Answer |
-|--------|--------|
-| Attack type | `1` (FGSM) |
-| Targeted? | `n` |
-| Epsilon | `0.1` |
-| Model | `3` (cnn_cifar) |
-| Load weights? | `n` |
-| Dataset | `3` (cifar10) |
-| Single image? | `n` |
-| Max samples | `20` |
-
-### 2. Run the attack
-
-```bash
 python generated_attack.py
 ```
 
-CIFAR-10 downloads automatically the first time. The script trains a small model, runs the attack, and saves results.
+CIFAR-10 downloads automatically.
 
-### 3. Look at the results
+### Why the first try may not fool the model
 
-In the same folder you will have:
+The generated script only quick-trains for 8 epochs. That is often too weak on CIFAR-10.
+
+**After generating the script, open `generated_attack.py` and change:**
+
+```python
+def train_quick(model, x, y, epochs=8, lr=0.001):
+```
+
+to:
+
+```python
+def train_quick(model, x, y, epochs=20, lr=0.001):
+```
+
+Then run `python generated_attack.py` again.
+
+### What you should see
+
+- Clean accuracy around 30–50%
+- Adversarial accuracy much lower (often near 0%)
+- Line like: `Result: attack changed the prediction on 50%+ of samples.`
+- `Attack was effective.`
+
+### Results folder
 
 ```
-orig_samples/            # original CIFAR-10 images
-adversarial_samples/     # adversarial versions
-before_after.png         # side-by-side of the first few
-summary.json             # clean vs adversarial accuracy
+orig_samples/            # original images
+adversarial_samples/     # adversarial images
+before_after.png         # top = original, bottom = adversarial
+summary.json
 ```
 
-Open `before_after.png` to see original vs adversarial.  
-The top row is the original images; the bottom row is after the attack.
+### CIFAR-10 class numbers (if you use a targeted attack)
 
-### 4. What you should see
+| Number | Class     | Number | Class  |
+|--------|-----------|--------|--------|
+| 0      | airplane  | 5      | dog    |
+| 1      | automobile| 6      | frog   |
+| 2      | bird      | 7      | horse  |
+| 3      | cat       | 8      | ship   |
+| 4      | deer      | 9      | truck  |
 
-- Clean accuracy on the small set (often 30–70% after quick training)
-- Lower adversarial accuracy
-- A printed line like: `Result: attack changed the prediction on XX% of samples.`
-
-### CIFAR-10 class numbers (for targeted attacks)
-
-| Number | Class |
-|--------|-------|
-| 0 | airplane |
-| 1 | automobile |
-| 2 | bird |
-| 3 | cat |
-| 4 | deer |
-| 5 | dog |
-| 6 | frog |
-| 7 | horse |
-| 8 | ship |
-| 9 | truck |
-
-To force a specific class (for example “make it a dog”), choose targeted = `y` and enter `5`.
-
-### Tips for a stronger example
-
-- Use a larger epsilon (e.g. `0.2`) if the attack looks weak
-- Choose `PGD` (option 3) for a stronger iterative attack
-- Use more samples (e.g. `50`) for a clearer summary
+For a targeted example, answer `y` to “Targeted attack?” and enter a class number (e.g. `5` for dog).
