@@ -169,7 +169,11 @@ def build_model():
     )
 '''
     elif model_type == "cnn_small":
-        in_ch = 1 if config.get("color_mode", "RGB") == "L" else 3
+        # Grayscale datasets need 1 channel; color datasets need 3
+        if dataset_type in ("mnist", "sklearn_digits") or config.get("color_mode") == "L":
+            in_ch = 1
+        else:
+            in_ch = 3
         model_code = f'''
 class SmallCNN(nn.Module):
     def __init__(self, in_channels={in_ch}, num_classes=10):
@@ -564,31 +568,56 @@ def main():
         else:
             print("Attack had limited effect. Try a larger epsilon or more steps.")
 
-    # Save before/after image for single sample
-    if len(x) == 1:
-        try:
-            import matplotlib.pyplot as plt
-            fig, axes = plt.subplots(1, 2, figsize=(6, 3))
-            img_orig = x[0].cpu().permute(1, 2, 0).numpy()
-            img_adv = x_adv[0].cpu().permute(1, 2, 0).numpy()
-            if img_orig.shape[-1] == 1:
-                img_orig = img_orig.squeeze(-1)
-                img_adv = img_adv.squeeze(-1)
-                axes[0].imshow(img_orig, cmap="gray")
-                axes[1].imshow(img_adv, cmap="gray")
+    # Save individual images
+    orig_dir = OUTPUT_DIR / "orig_samples"
+    adv_dir = OUTPUT_DIR / "adversarial_samples"
+    orig_dir.mkdir(exist_ok=True)
+    adv_dir.mkdir(exist_ok=True)
+
+    def save_images(tensor, folder, prefix):
+        from PIL import Image
+        for i in range(len(tensor)):
+            img = tensor[i].cpu()
+            if img.shape[0] == 1:
+                img = img.squeeze(0)
+                arr = (img.numpy() * 255).clip(0, 255).astype("uint8")
+                Image.fromarray(arr, mode="L").save(folder / f"{{prefix}}_{{i:04d}}.png")
             else:
-                axes[0].imshow(img_orig)
-                axes[1].imshow(img_adv)
-            axes[0].set_title(f"Original\\nPred: {{orig_pred.item()}}")
-            axes[1].set_title(f"Adversarial\\nPred: {{adv_pred.item()}}")
-            axes[0].axis("off")
-            axes[1].axis("off")
-            fig.tight_layout()
-            fig.savefig(OUTPUT_DIR / "before_after.png", dpi=150)
-            plt.close()
-            print(f"Saved comparison image to {{OUTPUT_DIR / 'before_after.png'}}")
-        except Exception as e:
-            print(f"Could not save comparison image: {{e}}")
+                arr = (img.permute(1, 2, 0).numpy() * 255).clip(0, 255).astype("uint8")
+                Image.fromarray(arr, mode="RGB").save(folder / f"{{prefix}}_{{i:04d}}.png")
+
+    save_images(x, orig_dir, "orig")
+    save_images(x_adv, adv_dir, "adv")
+    print(f"Saved original images to {{orig_dir}}")
+    print(f"Saved adversarial images to {{adv_dir}}")
+
+    # Side-by-side comparison for the first few
+    try:
+        import matplotlib.pyplot as plt
+        n_show = min(5, len(x))
+        fig, axes = plt.subplots(2, n_show, figsize=(2 * n_show, 4))
+        if n_show == 1:
+            axes = axes.reshape(2, 1)
+        for i in range(n_show):
+            def to_disp(t):
+                im = t.cpu()
+                if im.shape[0] == 1:
+                    return im.squeeze(0).numpy(), "gray"
+                return im.permute(1, 2, 0).numpy(), None
+            im0, cmap0 = to_disp(x[i])
+            im1, cmap1 = to_disp(x_adv[i])
+            axes[0, i].imshow(im0, cmap=cmap0)
+            axes[1, i].imshow(im1, cmap=cmap1)
+            axes[0, i].set_title(f"Orig {{orig_pred[i].item()}}")
+            axes[1, i].set_title(f"Adv {{adv_pred[i].item()}}")
+            axes[0, i].axis("off")
+            axes[1, i].axis("off")
+        fig.tight_layout()
+        fig.savefig(OUTPUT_DIR / "before_after.png", dpi=150)
+        plt.close()
+        print(f"Saved comparison grid to {{OUTPUT_DIR / 'before_after.png'}}")
+    except Exception as e:
+        print(f"Could not save comparison grid: {{e}}")
 
     np.save(OUTPUT_DIR / "x_adv.npy", x_adv.cpu().numpy())
     np.save(OUTPUT_DIR / "y.npy", y.cpu().numpy())
