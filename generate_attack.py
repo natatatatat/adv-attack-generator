@@ -219,10 +219,23 @@ def build_model():
     elif model_type == "resnet18":
         model_code = '''
 def build_model():
-    from torchvision import models
-    # Downloads ImageNet pretrained weights if no local file is provided
+    from torchvision import models, transforms
     model = models.resnet18(weights="DEFAULT")
-    return model
+    # ImageNet normalization so pretrained weights work correctly
+    mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1)
+    std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1)
+
+    class NormalizedResNet(nn.Module):
+        def __init__(self, base):
+            super().__init__()
+            self.base = base
+            self.register_buffer("mean", mean)
+            self.register_buffer("std", std)
+        def forward(self, x):
+            x = (x - self.mean) / self.std
+            return self.base(x)
+
+    return NormalizedResNet(model)
 '''
     elif model_type == "h5_keras":
         model_code = '''
@@ -618,29 +631,37 @@ def main():
             if img.shape[0] == 1:
                 img = img.squeeze(0)
                 arr = (img.numpy() * 255).clip(0, 255).astype("uint8")
-                Image.fromarray(arr, mode="L").save(folder / f"{{prefix}}_{{i:04d}}.png")
+                pil = Image.fromarray(arr, mode="L")
             else:
                 arr = (img.permute(1, 2, 0).numpy() * 255).clip(0, 255).astype("uint8")
-                Image.fromarray(arr, mode="RGB").save(folder / f"{{prefix}}_{{i:04d}}.png")
+                pil = Image.fromarray(arr, mode="RGB")
+            # Scale up small images (e.g. 32x32 CIFAR) so they are easy to view
+            if pil.width < 128:
+                scale = max(1, 128 // pil.width)
+                pil = pil.resize((pil.width * scale, pil.height * scale), Image.NEAREST)
+            pil.save(folder / f"{{prefix}}_{{i:04d}}.png")
 
     save_images(x, orig_dir, "orig")
     save_images(x_adv, adv_dir, "adv")
     print(f"Saved original images to {{orig_dir}}")
     print(f"Saved adversarial images to {{adv_dir}}")
 
-    # Side-by-side comparison (works without matplotlib)
+    # Side-by-side comparison (scaled up so small images are easy to see)
     try:
         from PIL import Image as PILImage
         n_show = min(5, len(x))
+        scale = 8  # make 32x32 look like 256x256
         thumbs = []
         for i in range(n_show):
             def to_pil(t):
                 im = t.cpu()
                 if im.shape[0] == 1:
                     arr = (im.squeeze(0).numpy() * 255).clip(0, 255).astype("uint8")
-                    return PILImage.fromarray(arr, mode="L").convert("RGB")
-                arr = (im.permute(1, 2, 0).numpy() * 255).clip(0, 255).astype("uint8")
-                return PILImage.fromarray(arr, mode="RGB")
+                    pil = PILImage.fromarray(arr, mode="L").convert("RGB")
+                else:
+                    arr = (im.permute(1, 2, 0).numpy() * 255).clip(0, 255).astype("uint8")
+                    pil = PILImage.fromarray(arr, mode="RGB")
+                return pil.resize((pil.width * scale, pil.height * scale), PILImage.NEAREST)
             thumbs.append((to_pil(x[i]), to_pil(x_adv[i])))
         w, h = thumbs[0][0].size
         grid = PILImage.new("RGB", (w * n_show, h * 2), (255, 255, 255))
