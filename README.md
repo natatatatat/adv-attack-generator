@@ -1,7 +1,7 @@
 # Adversarial Attack Script Generator
 
 Interactive tool that generates a ready-to-run adversarial attack script from simple prompts.  
-No need to write the attack code yourself, choose the attack, model, and dataset, then run the generated script.
+No need to write the attack code yourself: choose the attack, model, and dataset, then run the generated script.
 
 > **Note:** This is a personal project for learning and authorized testing only.  
 > It is not related to my employer and was built outside of work.  
@@ -66,6 +66,7 @@ python -c "import torch; print(torch.__version__); print('OK')"
 python generate_attack.py
 ```
 
+Answer the prompts. It writes:
 
 - `generated_attack.py` — the attack script
 - `generated_config.json` — your choices
@@ -93,7 +94,7 @@ After the attack finishes you will have:
 └── summary.json             # accuracy before and after
 ```
 
-`before_after.png` is saved next to the script.
+`before_after.png` is saved next to the script (Pillow only, no matplotlib required).
 
 ## Attacks
 
@@ -204,3 +205,79 @@ summary.json
 | 4      | deer       | 9      | truck  |
 
 For a targeted attack, answer `y` to “Targeted attack?” and enter a class number (for example `5` for dog).
+
+## Example: Targeted attack (make it a dog)
+
+Same as the CIFAR-10 example, but force class 5 (dog).
+
+### Every prompt
+
+```
+Choose attack type:                          3
+Targeted attack? [y/N]:                      y
+Target class number [7]:                     5
+Max perturbation epsilon (0.0-1.0) [0.1]:    0.15
+Number of steps [10]:                        20
+Step size [0.0375]:                          0.02
+Choose model:                                3
+Load weights from a .pt file? [y/N]:         n
+Choose dataset:                              3
+Attack a single uploaded image? [y/N]:       n
+Max number of samples to attack [200]:       30
+```
+
+Then run `python generated_attack.py`.
+
+The script tries to push predictions toward class 5 (dog). Check `before_after.png` and the printed predictions.
+
+## Example: Upload your own image
+
+Use this when you have a photo (cat, dog, etc.) and want to attack that one image.
+
+**Best results:** choose ResNet-18 so it downloads a pretrained model.
+
+### Every prompt
+
+```
+Choose attack type:                          3
+Targeted attack? [y/N]:                      y
+Target class number [7]:                     5
+Max perturbation epsilon (0.0-1.0) [0.1]:    0.05
+Number of steps [10]:                        10
+Step size [0.0125]:                          0.01
+Choose model:                                4
+Download pretrained ImageNet weights? [Y/n]: y
+Choose dataset:                              3
+Attack a single uploaded image? [y/N]:       y
+Use ResNet-18 instead? (if asked) [Y/n]:     y
+Path to the image file:                      /path/to/your/image.jpg
+Resize the image? [Y/n]:                     y
+Resize to this square size [32]:             224
+Image color mode:                            1
+```
+
+Replace `/path/to/your/image.jpg` with your file (png or jpg).
+
+### Run it
+
+```bash
+python generate_attack.py
+# enter the answers above
+
+python generated_attack.py
+```
+
+### What you get
+
+- `orig_samples/` — your original image
+- `adversarial_samples/` — the attacked image
+- `before_after.png` — side by side (top = original, bottom = adversarial)
+
+### Tips
+
+- Use a clear photo (not a tiny icon)
+- ResNet-18 expects roughly 224×224 color images
+- Class numbers for ImageNet are different from CIFAR-10.  
+  Example ImageNet indexes: many dog breeds are in the 150–270 range.  
+  If you are unsure, start untargeted (`n`) so it just changes the prediction to anything else.
+- Epsilon `0.05` keeps the image looking similar. Increase to `0.1` if the class does not change.
