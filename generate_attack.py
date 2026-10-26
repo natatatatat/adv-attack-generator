@@ -473,9 +473,14 @@ def attack(model, x, y, max_iter=20, overshoot=0.02):
     return x_adv
 '''
     else:  # I-FGSM/BIM and PGD
+        random_start = "True" if attack == "PGD" else "False"
         attack_fn = f'''
-def attack(model, x, y, epsilon={epsilon}, step_size={step_size}, steps={steps}):
+def attack(model, x, y, epsilon={epsilon}, step_size={step_size}, steps={steps}, random_start={random_start}):
     x_adv = x.clone().detach()
+    if random_start:
+        # PGD: start from a random point inside the epsilon ball
+        x_adv = x_adv + torch.empty_like(x_adv).uniform_(-epsilon, epsilon)
+        x_adv = torch.clamp(x_adv, 0, 1)
     for _ in range(steps):
         x_adv.requires_grad_(True)
         logits = model(x_adv)
