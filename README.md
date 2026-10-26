@@ -141,7 +141,7 @@ You can provide a `.pt` weights file for most models. ResNet-18 can download pre
 
 ## Example: CIFAR-10 that fools the model
 
-This example uses PGD on CIFAR-10. With these settings the attack changes most predictions.
+This example uses PGD on CIFAR-10. It often changes some predictions. If it looks weak, train longer (see below).
 
 ### Every prompt
 
@@ -235,8 +235,6 @@ The script tries to push predictions toward class 5 (dog). Check `before_after.p
 
 This example was tested on a pug photo. With ResNet-18 and epsilon `0.05`, the class changed (254 → another class).
 
-**Important:** use the latest `generate_attack.py`. It normalizes ResNet inputs correctly so the pretrained model can be fooled.
-
 ### Every prompt
 
 ```
@@ -251,9 +249,12 @@ Path to the image file:                      /path/to/your/image.jpg
 Resize the image? [Y/n]:                     y
 Resize to this square size [32]:             224
 Image color mode:                            1
+Force a specific target class? [y/N]:        n
 ```
 
 Use your own image path. PNG or JPG is fine.
+
+Answer `n` to “Force a specific target class?” unless you want one exact class.
 
 ### Run it
 
@@ -276,6 +277,8 @@ Saved comparison grid to .../before_after.png
 
 The numbers will differ for your image. The important part is that the class **changes**.
 
+On a single image, “Clean accuracy (vs labels)” is often `0.0000`. That is normal — the script does not know the true label. Look for **Attack succeeded**.
+
 ### Files
 
 - `orig_samples/` — your original image
@@ -287,6 +290,5 @@ The numbers will differ for your image. The important part is that the class **c
 - Raise epsilon to `0.08` or `0.1`
 - Or use PGD (attack type `3`) with 10 steps and step size `0.01`
 - Make sure you chose model `4` (ResNet-18) and said yes to downloading weights
-- Re-generate the script after updating `generate_attack.py` so normalization is included
 
 ImageNet class 254 is a pug. Other images will have different original class numbers. That is normal.
